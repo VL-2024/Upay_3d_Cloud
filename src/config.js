@@ -4,8 +4,11 @@
 export const CONFIG = {
   // --- Количество и размеры объектов ---
   chukoCount: 15, // обычных чүкө (+ 1 Хан)
-  chukoScale: 1,
-  khanScale: 1.18,
+  // Подняты с 1/1.18: на экране (особенно на телефоне) чүкө читались очень
+  // мелко. Все геометрически завязанные пороги ниже (hitProxyDiameter,
+  // layoutValidator.*) подняты пропорционально этому же множителю ~1.35x.
+  chukoScale: 1.35,
+  khanScale: 1.6,
   chukoSize: {
     // чүкө моделируется как вытянутая по X "капсула с квадратным сечением":
     // цилиндрическая часть даёт 4 плоские устойчивые грани (X±, вернее Y±/Z±),
@@ -16,7 +19,7 @@ export const CONFIG = {
     // Реальная модель мала на экране (особенно на телефоне) — тап мимо
     // видимой геометрии не должен промахиваться. Невидимая сфера этого
     // диаметра (м) служит увеличенной областью попадания для pointer-пика.
-    hitProxyDiameter: 0.11,
+    hitProxyDiameter: 0.15,
   },
 
   // --- Физика (Havok) ---
@@ -69,10 +72,10 @@ export const CONFIG = {
 
   // --- Валидатор раскладки ---
   layoutValidator: {
-    minDistanceForFlick: 0.11, // минимальная дистанция между парой для комфортного щелчка
+    minDistanceForFlick: 0.15, // минимальная дистанция между парой для комфортного щелчка
     maxStackHeightDelta: 0.05, // допустимая разница по Y при близких X/Z, иначе считается стопкой
-    stackXZThreshold: 0.018,
-    khanClearanceRadius: 0.13,
+    stackXZThreshold: 0.024,
+    khanClearanceRadius: 0.2,
     khanClearanceMaxNeighbors: 2,
     maxRerollAttempts: 12,
   },
