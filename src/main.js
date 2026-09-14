@@ -138,7 +138,6 @@ async function bootstrap() {
       requiredPairs: scenarioEngine.requiredPairsInLayout(),
       needsKhanStep,
     });
-
     if (result.valid || rerollAttempts >= CONFIG.layoutValidator.maxRerollAttempts) {
       if (!result.valid) {
         console.warn('[layout-validator] Раскладка принята после исчерпания попыток reroll:', result.reasons);

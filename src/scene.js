@@ -39,7 +39,9 @@ function createCamera(scene, canvas) {
     'mainCamera',
     -Math.PI / 2, // alpha: смотрим вдоль -Z
     0.38, // beta: небольшой наклон от вертикали (0 = строго сверху)
-    7.6, // radius
+    4.6, // radius — приближено, чтобы чүкө читались крупнее (см. config.js
+    // scatter.radius/jitter уменьшены соответственно, чтобы рассыпание
+    // укладывалось в теперь меньшую видимую область)
     new Vector3(0, 0, 0.15),
     scene
   );
