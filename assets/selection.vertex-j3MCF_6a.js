@@ -1,4 +1,4 @@
-import{t as e}from"./shaderStore-D-XQlhUT.js";import{$ as t,L as n,Q as r,R as i,Z as a,at as o,et as s,it as c,nt as l,ot as u,rt as d,tt as f}from"./index-CFzlVPpa.js";var p=`selectionVertexShader`,m=`attribute position: vec3f;
+import{t as e}from"./shaderStore-D-XQlhUT.js";import{$ as t,L as n,Q as r,R as i,Z as a,at as o,et as s,it as c,nt as l,ot as u,rt as d,tt as f}from"./index-ajpPUoo6.js";var p=`selectionVertexShader`,m=`attribute position: vec3f;
 #ifdef INSTANCES
 attribute instanceSelectionId: f32;
 #endif
