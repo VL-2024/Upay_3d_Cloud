@@ -1,4 +1,4 @@
-import{t as e}from"./shaderStore-D-XQlhUT.js";import{A as t,L as n,M as r,R as i,j as a,k as o}from"./index-D8Hkj1r9.js";var s=`gpuRenderParticlesVertexShader`,c=`uniform view: mat4x4f;uniform projection: mat4x4f;uniform translationPivot: vec2f;uniform worldOffset: vec3f;
+import{t as e}from"./shaderStore-D-XQlhUT.js";import{A as t,L as n,M as r,R as i,j as a,k as o}from"./index-CFzlVPpa.js";var s=`gpuRenderParticlesVertexShader`,c=`uniform view: mat4x4f;uniform projection: mat4x4f;uniform translationPivot: vec2f;uniform worldOffset: vec3f;
 #ifdef LOCAL
 uniform emitterWM: mat4x4f;
 #endif

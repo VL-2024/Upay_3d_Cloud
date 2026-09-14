@@ -1,4 +1,4 @@
-import{t as e}from"./shaderStore-D-XQlhUT.js";import{t}from"./sceneUboDeclaration-B5VhSG0v.js";import{t as n}from"./meshUboDeclaration-BmNu2KU_.js";import{C as r,G as i,H as a,S as o,V as s,a as c,b as l,n as u,o as d,x as f}from"./index-D8Hkj1r9.js";var p=`gaussianSplattingVertexShader`,m=`#include<__decl__gaussianSplattingVertex>
+import{t as e}from"./shaderStore-D-XQlhUT.js";import{t}from"./sceneUboDeclaration-B5VhSG0v.js";import{t as n}from"./meshUboDeclaration-BmNu2KU_.js";import{C as r,G as i,H as a,S as o,V as s,a as c,b as l,n as u,o as d,x as f}from"./index-CFzlVPpa.js";var p=`gaussianSplattingVertexShader`,m=`#include<__decl__gaussianSplattingVertex>
 #ifdef LOGARITHMICDEPTH
 #extension GL_EXT_frag_depth : enable
 #endif
