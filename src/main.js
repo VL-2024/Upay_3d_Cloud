@@ -1,4 +1,7 @@
 // Bootstrap: запуск Babylon.js, инициализация сцены, физики и игрового цикла.
+// Билетный цикл целиком следует §5/§17 ТЗ: REQUESTING_TICKET → SCATTERING →
+// SETTLING → READY ⇄ AIMING → FLICKING → COLLECTING → READY/KHAN_READY →
+// RESULT → FINISHED.
 import { Engine } from '@babylonjs/core';
 import { AdvancedDynamicTexture, TextBlock, Control } from '@babylonjs/gui';
 
@@ -9,12 +12,14 @@ import { createChuko } from './chuko.js';
 import { createKhan } from './khan.js';
 import { scatterAll } from './scatter.js';
 import { validateLayout } from './layout-validator.js';
-import { classifyAll, ORIENTATION_LABELS } from './orientation.js';
+import { classifyAll, classifyOrientation, ORIENTATION_LABELS } from './orientation.js';
 import { setupInput } from './input.js';
 import { assistTrajectory } from './flick.js';
 import { getSource, clearSelection } from './pair-selector.js';
+import { createCollector, resetCollector, collectPiece } from './collector.js';
+import { requestDemoTicket, finishDemoTicket } from './lms-adapter.js';
 import { GameStateMachine, GameStates } from './game-state.js';
-import { ScenarioEngine, Scenarios } from './scenario-engine.js';
+import { ScenarioEngine, SCENARIO_CODES } from './scenario-engine.js';
 
 async function bootstrap() {
   const canvas = document.getElementById('renderCanvas');
@@ -26,34 +31,45 @@ async function bootstrap() {
 
   const chukoMeshes = Array.from({ length: CONFIG.chukoCount }, () => createChuko(scene, false));
   const khanMesh = createKhan(scene);
+  const collector = createCollector(scene);
 
-  const gameState = new GameStateMachine(GameStates.IDLE);
-  const scenarioEngine = new ScenarioEngine(CONFIG.scenario.default, CONFIG);
-
-  const ui = buildUI(gameState, scenarioEngine);
+  const gameState = new GameStateMachine(GameStates.INIT);
+  const scenarioEngine = new ScenarioEngine(CONFIG);
+  const ui = buildUI(gameState);
   const debugLayer = buildDebugLabels(scene, chukoMeshes, khanMesh);
 
   let rerollAttempts = 0;
   let stableFrames = 0;
   let stabilizeFrames = 0;
   let activeFlick = null;
-  let pendingScenarioComplete = null;
+  let currentTicket = null;
+  let reservedForKhan = null;
 
-  function beginDeal() {
-    if (!gameState.is(GameStates.IDLE, GameStates.READY, GameStates.RESULT)) return;
+  function beginTicket() {
+    if (!gameState.is(GameStates.INIT, GameStates.FINISHED, GameStates.RESULT)) return;
+
+    gameState.set(GameStates.REQUESTING_TICKET);
+    currentTicket = requestDemoTicket(ui.getForcedScenarioCode());
+    scenarioEngine.start(currentTicket.scenarioCode);
 
     clearSelection();
-    scenarioEngine.reset(ui.getSelectedScenario());
+    resetCollector(collector);
+    reservedForKhan = null;
     activeFlick = null;
-    pendingScenarioComplete = null;
     rerollAttempts = 0;
     stableFrames = 0;
     stabilizeFrames = 0;
 
     khanMesh.metadata.khanUnlocked = false;
+    khanMesh.metadata.state = 'idle';
+    for (const m of chukoMeshes) m.metadata.state = 'idle';
+
+    ui.setTicket(currentTicket);
+    ui.setHint('Рассыпаем чүкө…');
+
     scatterAll(chukoMeshes, khanMesh);
     gameState.set(GameStates.SCATTERING);
-    gameState.set(GameStates.STABILIZING);
+    gameState.set(GameStates.SETTLING);
   }
 
   function stepStabilization() {
@@ -66,22 +82,25 @@ async function bootstrap() {
     const settled = stableFrames >= CONFIG.stability.minStableFrames;
     const timedOut = stabilizeFrames >= CONFIG.stability.maxWaitFrames;
 
-    if (settled || timedOut) {
-      gameState.set(GameStates.VALIDATING);
-    }
+    if (settled || timedOut) validateAndProceed();
   }
 
-  function stepValidation() {
-    classifyAll(chukoMeshes);
-    classifyAll([khanMesh]);
-
-    const requiredPairs = scenarioEngine.requiredPairsInLayout();
-    const result = validateLayout(chukoMeshes, khanMesh, camera, requiredPairs);
+  function validateAndProceed() {
+    const needsKhanStep = scenarioEngine.needsKhanStep();
+    const result = validateLayout(chukoMeshes, khanMesh, camera, {
+      requiredPairs: scenarioEngine.requiredPairsInLayout(),
+      needsKhanStep,
+    });
 
     if (result.valid || rerollAttempts >= CONFIG.layoutValidator.maxRerollAttempts) {
       if (!result.valid) {
         console.warn('[layout-validator] Раскладка принята после исчерпания попыток reroll:', result.reasons);
       }
+      if (needsKhanStep && result.khanReserveCandidate) {
+        reservedForKhan = result.khanReserveCandidate;
+        reservedForKhan.metadata.state = 'reserved';
+      }
+      ui.setHint('Выберите чүкө');
       gameState.set(GameStates.READY);
       return;
     }
@@ -90,27 +109,71 @@ async function bootstrap() {
     stableFrames = 0;
     stabilizeFrames = 0;
     scatterAll(chukoMeshes, khanMesh);
-    gameState.set(GameStates.STABILIZING);
+    // Остаёмся в SETTLING — reroll незаметен для игрока (§9 ТЗ).
   }
 
   function handleFlick(result) {
     activeFlick = result;
     gameState.set(GameStates.FLICKING);
-
-    // В разрешённом ходе финансовый/сценарный исход не зависит от точной
-    // физической траектории — фиксируем сбор пары сразу (см. ТЗ §11/§13).
-    result.source.metadata.state = 'collected';
-    result.target.metadata.state = 'collected';
-    scenarioEngine.recordSuccessfulFlick(result, khanMesh);
+    result.source.metadata.state = 'flicking';
+    result.target.metadata.state = 'flicking';
+    ui.setHint('');
   }
 
-  scenarioEngine.on('scenario-complete', (payload) => {
-    pendingScenarioComplete = payload;
+  scenarioEngine.on('khan-unlocked', () => {
+    khanMesh.metadata.khanUnlocked = true;
+    if (reservedForKhan) {
+      reservedForKhan.metadata.state = 'idle';
+      reservedForKhan = null;
+    }
   });
-  scenarioEngine.on('pair-collected', ({ count }) => ui.setStatus(`Собрано пар: ${count}`));
-  scenarioEngine.on('upay-formed', ({ upayCount }) => ui.setStatus(`Упай собран! Всего: ${upayCount}`));
-  scenarioEngine.on('khan-unlocked', () => ui.setStatus('Хан разблокирован!'));
-  scenarioEngine.on('khan-hit', () => ui.setStatus('Удар по Хану выполнен!'));
+  scenarioEngine.on('khan-message', ({ text }) => ui.setHint(text));
+  scenarioEngine.on('pair-collected', ({ inCurrentUpay, upaySlot }) =>
+    ui.setStatus(`УПАЙ ${upaySlot}: ${inCurrentUpay}/${CONFIG.scenario.pairsPerUpay}`)
+  );
+  scenarioEngine.on('upay-formed', ({ upayCount }) => ui.setStatus(`${upayCount} УПАЙ собран`));
+
+  function onFlickSettled(result) {
+    const isKhanFlick = result.source.metadata.isKhan || result.target.metadata.isKhan;
+
+    if (isKhanFlick) {
+      result.target.metadata.state = 'collected';
+      result.source.metadata.state = 'collected';
+      const payload = scenarioEngine.recordSuccessfulFlick(result);
+      finishOrContinue(payload);
+      return;
+    }
+
+    // Целевой чүкө собран и уходит в зону УПАЙ; источник возвращается в игру
+    // на новом (физически осевшем) положении (§10/§11 ТЗ).
+    classifyOrientation(result.source);
+    result.source.metadata.state = 'idle';
+    result.target.metadata.state = 'collected';
+
+    const upayIndex = scenarioEngine.upayCount;
+    const slotIndex = scenarioEngine.collectedInCurrentUpay;
+    const payload = scenarioEngine.recordSuccessfulFlick(result);
+
+    gameState.set(GameStates.COLLECTING);
+    collectPiece(result.target, collector, upayIndex, slotIndex, CONFIG, () => {
+      finishOrContinue(payload);
+    });
+  }
+
+  function finishOrContinue(payload) {
+    if (payload) {
+      gameState.set(GameStates.RESULT);
+      ui.showResult(currentTicket, payload);
+      return;
+    }
+    if (scenarioEngine.khanUnlocked) {
+      ui.setHint('ХАН!');
+      gameState.set(GameStates.KHAN_READY);
+    } else {
+      ui.setHint('Выберите чүкө');
+      gameState.set(GameStates.READY);
+    }
+  }
 
   function stepFlicking() {
     if (!activeFlick) {
@@ -122,12 +185,9 @@ async function bootstrap() {
     const sourceSlow = isBodySlow(activeFlick.source.metadata.body);
     const targetSlow = isBodySlow(activeFlick.target.metadata.body);
     if (sourceSlow && targetSlow) {
+      const result = activeFlick;
       activeFlick = null;
-      if (pendingScenarioComplete) {
-        gameState.set(GameStates.RESULT);
-      } else {
-        gameState.set(GameStates.READY);
-      }
+      onFlickSettled(result);
     }
   }
 
@@ -136,21 +196,26 @@ async function bootstrap() {
     camera,
     chukoMeshes,
     khanMesh,
-    () => gameState.is(GameStates.READY, GameStates.AIMING),
+    () => gameState.isInputAllowed(),
     handleFlick
   );
 
-  ui.onScatter(beginDeal);
+  ui.onNewTicket(beginTicket);
 
   gameState.onChange((next) => ui.setState(next));
   ui.setState(gameState.state);
 
   scene.onBeforeRenderObservable.add(() => {
-    if (gameState.is(GameStates.STABILIZING)) stepStabilization();
-    else if (gameState.is(GameStates.VALIDATING)) stepValidation();
+    if (gameState.is(GameStates.SETTLING)) stepStabilization();
     else if (gameState.is(GameStates.FLICKING)) stepFlicking();
-    else if (gameState.is(GameStates.READY) && getSource()) gameState.set(GameStates.AIMING);
-    else if (gameState.is(GameStates.AIMING) && !getSource()) gameState.set(GameStates.READY);
+    else if (gameState.is(GameStates.READY, GameStates.KHAN_READY) && getSource()) {
+      gameState.set(GameStates.AIMING);
+      ui.setHint('Выберите такой же');
+    } else if (gameState.is(GameStates.AIMING) && !getSource()) {
+      const back = scenarioEngine.khanUnlocked ? GameStates.KHAN_READY : GameStates.READY;
+      ui.setHint(back === GameStates.KHAN_READY ? 'ХАН!' : 'Выберите чүкө');
+      gameState.set(back);
+    }
 
     debugLayer.update();
     ui.updateFps(engine.getFps());
@@ -159,19 +224,40 @@ async function bootstrap() {
   engine.runRenderLoop(() => scene.render());
   window.addEventListener('resize', () => engine.resize());
 
+  gameState.set(GameStates.FINISHED);
+  ui.onFinishTicket(() => {
+    if (!gameState.is(GameStates.RESULT)) return;
+    if (currentTicket) finishDemoTicket(currentTicket);
+    gameState.set(GameStates.FINISHED);
+    ui.setHint('Нажмите «НОВЫЙ БИЛЕТ»');
+  });
+
   document.getElementById('loadingOverlay')?.remove();
 }
 
-function buildUI(gameState, scenarioEngine) {
-  const scatterBtn = document.getElementById('scatterBtn');
+function buildUI(gameState) {
+  const newTicketBtn = document.getElementById('newTicketBtn');
   const scenarioSelect = document.getElementById('scenarioSelect');
   const statusText = document.getElementById('statusText');
   const stateText = document.getElementById('stateText');
+  const hintText = document.getElementById('hintText');
+  const ticketText = document.getElementById('ticketText');
   const fpsText = document.getElementById('fpsText');
+  const resultPanel = document.getElementById('resultPanel');
+  const resultTitle = document.getElementById('resultTitle');
+  const resultAmount = document.getElementById('resultAmount');
+  const resultCloseBtn = document.getElementById('resultCloseBtn');
 
   const debugFpsCb = document.getElementById('dbgFps');
   const debugBodiesCb = document.getElementById('dbgBodies');
   const debugLabelsCb = document.getElementById('dbgLabels');
+
+  for (const code of SCENARIO_CODES) {
+    const opt = document.createElement('option');
+    opt.value = code;
+    opt.textContent = code;
+    scenarioSelect.appendChild(opt);
+  }
 
   debugFpsCb.checked = CONFIG.debug.showFps;
   debugBodiesCb.checked = CONFIG.debug.showPhysicsBodies;
@@ -188,24 +274,41 @@ function buildUI(gameState, scenarioEngine) {
     CONFIG.debug.showPhysicsBodies = debugBodiesCb.checked;
   });
 
+  let finishCb = null;
+
+  resultCloseBtn.addEventListener('click', () => {
+    resultPanel.hidden = true;
+    finishCb?.();
+  });
+
   return {
-    onScatter(cb) {
-      scatterBtn.addEventListener('click', cb);
+    onNewTicket(cb) {
+      newTicketBtn.addEventListener('click', cb);
     },
-    getSelectedScenario() {
-      return scenarioSelect.value || Scenarios.ONE;
+    onFinishTicket(cb) {
+      finishCb = cb;
+    },
+    getForcedScenarioCode() {
+      return scenarioSelect.value === 'AUTO' ? null : scenarioSelect.value;
+    },
+    setTicket(ticket) {
+      ticketText.textContent = `Билет: ${ticket.ticketId} · ${ticket.scenarioCode}`;
     },
     setStatus(text) {
       statusText.textContent = text;
     },
+    setHint(text) {
+      hintText.textContent = text;
+    },
     setState(state) {
       stateText.textContent = state;
-      scatterBtn.disabled = ![
-        GameStates.IDLE,
-        GameStates.READY,
-        GameStates.RESULT,
-        GameStates.AIMING,
-      ].includes(state);
+      newTicketBtn.disabled = ![GameStates.INIT, GameStates.FINISHED, GameStates.RESULT].includes(state);
+    },
+    showResult(ticket, payload) {
+      resultPanel.hidden = false;
+      resultTitle.textContent = payload.resultLabel ?? 'Без УПАЙ';
+      resultAmount.textContent =
+        ticket.winAmount > 0 ? `Выигрыш (DEMO): ${ticket.winAmount}` : 'В этот раз без выигрыша';
     },
     updateFps(fps) {
       if (!CONFIG.debug.showFps) return;

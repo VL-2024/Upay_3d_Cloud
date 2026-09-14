@@ -3,7 +3,7 @@
 // количество пар и минимальную дистанцию для щелчка.
 import { Vector3, Frustum } from '@babylonjs/core';
 import { CONFIG } from './config.js';
-import { classifyAll } from './orientation.js';
+import { classifyAll, classifyOrientation } from './orientation.js';
 
 function checkBounds(all, workArea, reasons) {
   const halfW = workArea.width / 2;
@@ -52,11 +52,13 @@ function checkKhanClearance(chukoMeshes, khanMesh, v, reasons) {
   }
 }
 
-function checkPairsAndDistance(chukoMeshes, v, requiredPairs, reasons) {
-  classifyAll(chukoMeshes);
+function findKhanReserveCandidate(chukoMeshes, khanMesh) {
+  return chukoMeshes.find((m) => m.metadata.orientation === khanMesh.metadata.orientation) ?? null;
+}
 
+function checkPairsAndDistance(pool, v, requiredPairs, reasons) {
   const byOrientation = {};
-  for (const m of chukoMeshes) {
+  for (const m of pool) {
     const code = m.metadata.orientation;
     (byOrientation[code] = byOrientation[code] || []).push(m);
   }
@@ -85,18 +87,40 @@ function checkPairsAndDistance(chukoMeshes, v, requiredPairs, reasons) {
 
 /**
  * Полная проверка раскладки. Требует, чтобы объекты уже физически остановились.
- * requiredPairs — минимум пар, нужных текущему сценарию (см. scenario-engine.js).
+ *
+ * scenarioNeeds.requiredPairs — сколько 'pair'-шагов должен пройти сценарий.
+ * scenarioNeeds.needsKhanStep — есть ли в сценарии ход на Хана: тогда среди
+ * обычных чүкө должен найтись хотя бы один с тем же положением, что и у Хана
+ * (§7 — раскладка должна гарантированно позволять пройти сценарий). Такой
+ * чүкө возвращается как khanReserveCandidate и исключается из подсчёта пар:
+ * до Хан-шага он резервируется и не предлагается игроку (см. main.js).
  */
-export function validateLayout(chukoMeshes, khanMesh, camera, requiredPairs = 1, config = CONFIG) {
+export function validateLayout(chukoMeshes, khanMesh, camera, scenarioNeeds = {}, config = CONFIG) {
+  const { requiredPairs = 1, needsKhanStep = false } = scenarioNeeds;
   const reasons = [];
   const all = [...chukoMeshes, khanMesh];
+
+  classifyAll(chukoMeshes);
+  classifyOrientation(khanMesh);
 
   checkBounds(all, config.workArea, reasons);
   checkStacking(all, config.layoutValidator, reasons);
   checkVisibility(chukoMeshes, khanMesh, camera, reasons);
   checkKhanClearance(chukoMeshes, khanMesh, config.layoutValidator, reasons);
+
+  let khanReserveCandidate = null;
+  let pool = chukoMeshes;
+  if (needsKhanStep) {
+    khanReserveCandidate = findKhanReserveCandidate(chukoMeshes, khanMesh);
+    if (!khanReserveCandidate) {
+      reasons.push('no_khan_partner');
+    } else {
+      pool = chukoMeshes.filter((m) => m !== khanReserveCandidate);
+    }
+  }
+
   const { byOrientation, availablePairs } = checkPairsAndDistance(
-    chukoMeshes,
+    pool,
     config.layoutValidator,
     requiredPairs,
     reasons
@@ -107,5 +131,6 @@ export function validateLayout(chukoMeshes, khanMesh, camera, requiredPairs = 1,
     reasons,
     orientationGroups: byOrientation,
     availablePairs,
+    khanReserveCandidate,
   };
 }

@@ -105,6 +105,32 @@ export const CONFIG = {
   scenario: {
     default: 'ONE',
     pairsPerUpay: 3,
+    // ДЕМО-таблица выплат. НЕ является источником финансового результата —
+    // используется только demo-adapter'ом (см. lms-adapter.js) для локальной
+    // проверки без денежных операций (§18, §21 ТЗ). В Real-режиме winAmount
+    // обязан приходить готовым от LMS.
+    demoPayouts: {
+      ZERO_A: 0,
+      ZERO_B: 0,
+      ONE: 50,
+      ONE_PLUS: 80,
+      TWO: 150,
+      KHAN: 300,
+      TWO_KHAN: 600,
+      ALTYN: 1000,
+    },
+  },
+
+  // --- Зоны накопления УПАЙ 1/2 (collector.js) ---
+  collector: {
+    zones: {
+      upay1: { x: -0.85, z: 1.85 },
+      upay2: { x: 0.85, z: 1.85 },
+    },
+    slotSpacing: 0.14, // расстояние между тремя слотами внутри зоны, м
+    slotDiameter: 0.1, // диаметр опорного диска-слота
+    arcHeight: 0.35, // высота дуги переноса, м
+    arcDurationMs: 550,
   },
 
   // --- Debug-флаги ---

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>УПАЙ — 3D-прототип v0.1</title>
+    <title>УПАЙ — 3D-прототип</title>
     <style>
       :root {
         --ui-height: 24vh;
@@ -50,6 +50,75 @@
         border-radius: 4px;
         pointer-events: none;
         z-index: 5;
+      }
+
+      #ticketText {
+        position: absolute;
+        top: 8px;
+        left: 10px;
+        font-size: 11px;
+        color: #b8b0a0;
+        background: rgba(0, 0, 0, 0.35);
+        padding: 2px 6px;
+        border-radius: 4px;
+        pointer-events: none;
+        z-index: 5;
+        letter-spacing: 0.02em;
+      }
+
+      #hintText {
+        position: absolute;
+        top: 36px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 14px;
+        font-weight: 600;
+        color: #241a06;
+        background: linear-gradient(180deg, #e8b64a, #c98d1d);
+        padding: 6px 16px;
+        border-radius: 999px;
+        pointer-events: none;
+        z-index: 5;
+        white-space: nowrap;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        transition: opacity 0.15s ease;
+      }
+      #hintText:empty {
+        opacity: 0;
+      }
+
+      #resultPanel:not([hidden]) {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: rgba(6, 5, 4, 0.86);
+        z-index: 50;
+        text-align: center;
+        padding: 24px;
+      }
+      #resultTitle {
+        font-size: 30px;
+        font-weight: 800;
+        color: #e8b64a;
+        letter-spacing: 0.04em;
+      }
+      #resultAmount {
+        font-size: 16px;
+        color: #e6e0d2;
+      }
+      #resultCloseBtn {
+        margin-top: 10px;
+        font-size: 15px;
+        font-weight: 700;
+        padding: 12px 28px;
+        border-radius: 10px;
+        border: none;
+        background: linear-gradient(180deg, #e8b64a, #c98d1d);
+        color: #241a06;
       }
 
       #ui {
@@ -104,11 +173,11 @@
         font-size: 14px;
       }
 
-      #scatterBtn {
+      #newTicketBtn {
         flex: 1;
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 700;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.03em;
         padding: 14px 10px;
         border-radius: 12px;
         border: none;
@@ -116,11 +185,11 @@
         color: #241a06;
         box-shadow: 0 2px 0 #7d5b12;
       }
-      #scatterBtn:active {
+      #newTicketBtn:active {
         transform: translateY(1px);
         box-shadow: none;
       }
-      #scatterBtn:disabled {
+      #newTicketBtn:disabled {
         background: #4a4238;
         color: #8a8477;
         box-shadow: none;
@@ -175,20 +244,20 @@
     <div id="app">
       <canvas id="renderCanvas"></canvas>
       <div id="fpsText"></div>
+      <div id="ticketText">УПАЙ</div>
+      <div id="hintText"></div>
 
       <div id="ui">
         <div id="statusRow">
           <span id="stateText">LOADING</span>
-          <span id="statusText">УПАЙ v0.1</span>
+          <span id="statusText"></span>
         </div>
 
         <div id="controlsRow">
           <select id="scenarioSelect">
-            <option value="ONE" selected>Сценарий: ONE</option>
-            <option value="ZERO">Сценарий: ZERO</option>
-            <option value="KHAN">Сценарий: KHAN</option>
+            <option value="AUTO" selected>Сценарий: авто (LMS)</option>
           </select>
-          <button id="scatterBtn" type="button">РАССЫПАТЬ</button>
+          <button id="newTicketBtn" type="button">НОВЫЙ БИЛЕТ</button>
         </div>
 
         <div id="debugRow">
@@ -196,6 +265,12 @@
           <label><input type="checkbox" id="dbgLabels" /> Положения</label>
           <label><input type="checkbox" id="dbgBodies" /> Физ. тела</label>
         </div>
+      </div>
+
+      <div id="resultPanel" hidden>
+        <div id="resultTitle"></div>
+        <div id="resultAmount"></div>
+        <button id="resultCloseBtn" type="button">ПРОДОЛЖИТЬ</button>
       </div>
 
       <div id="loadingOverlay">

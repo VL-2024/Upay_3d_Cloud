@@ -1,19 +1,25 @@
-// Машина состояний партии: загрузка → рассыпание → стабилизация → валидация
-// раскладки → готовность к выбору → прицеливание → щелчок → результат.
+// Машина состояний партии (§17 ТЗ):
+// INIT → REQUESTING_TICKET → SCATTERING → SETTLING → READY → FLICKING →
+// COLLECTING → READY / KHAN_READY → RESULT → FINISHED.
+// Ввод игрока разрешён только в READY / AIMING / KHAN_READY.
 export const GameStates = Object.freeze({
-  LOADING: 'LOADING',
-  IDLE: 'IDLE', // сцена готова, ждём нажатия «РАССЫПАТЬ»
+  INIT: 'INIT',
+  REQUESTING_TICKET: 'REQUESTING_TICKET', // запрос билета у lms-adapter
   SCATTERING: 'SCATTERING',
-  STABILIZING: 'STABILIZING',
-  VALIDATING: 'VALIDATING',
-  READY: 'READY', // раскладка валидна, доступен выбор source
-  AIMING: 'AIMING', // source выбран, ждём target
+  SETTLING: 'SETTLING', // стабилизация физики + классификация + валидатор раскладки
+  READY: 'READY', // можно выбрать source
+  AIMING: 'AIMING', // source выбран, ждём target (уточнение READY для UX/ввода)
   FLICKING: 'FLICKING', // импульс применён, объекты летят
-  RESULT: 'RESULT', // сценарий завершён
+  COLLECTING: 'COLLECTING', // дуговая анимация переноса в зону УПАЙ
+  KHAN_READY: 'KHAN_READY', // Хан разблокирован, ждём разрешённого хода на него
+  RESULT: 'RESULT', // сценарий завершён, показан итог билета
+  FINISHED: 'FINISHED', // билет закрыт, ждём следующего
 });
 
+const INPUT_ALLOWED_STATES = new Set([GameStates.READY, GameStates.AIMING, GameStates.KHAN_READY]);
+
 export class GameStateMachine {
-  constructor(initial = GameStates.LOADING) {
+  constructor(initial = GameStates.INIT) {
     this.state = initial;
     this._listeners = [];
   }
@@ -27,6 +33,10 @@ export class GameStateMachine {
 
   is(...states) {
     return states.includes(this.state);
+  }
+
+  isInputAllowed() {
+    return INPUT_ALLOWED_STATES.has(this.state);
   }
 
   onChange(cb) {
