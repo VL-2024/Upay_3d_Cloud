@@ -143,13 +143,31 @@
         position: absolute;
         inset: 0;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: 16px;
+        padding: 24px;
         background: #0a0a0d;
         color: #e8b64a;
         font-size: 16px;
         letter-spacing: 0.08em;
+        text-align: center;
         z-index: 100;
+      }
+      #loadingHint {
+        max-width: 420px;
+        font-size: 13px;
+        letter-spacing: normal;
+        line-height: 1.6;
+        color: #d8d2c4;
+      }
+      #loadingHint code {
+        background: rgba(255, 255, 255, 0.08);
+        color: #f2efe6;
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 12px;
       }
     </style>
   </head>
@@ -180,9 +198,43 @@
         </div>
       </div>
 
-      <div id="loadingOverlay">ЗАГРУЗКА УПАЙ…</div>
+      <div id="loadingOverlay">
+        <div id="loadingSpinnerText">ЗАГРУЗКА УПАЙ…</div>
+        <div id="loadingHint" hidden>
+          Игра не смогла запуститься в браузере.<br />
+          Если вы открыли этот файл двойным кликом (адрес начинается с
+          <code>file://</code>), браузер блокирует загрузку — так работать
+          не будет.<br /><br />
+          Запустите через локальный сервер:<br />
+          <code>npm install &amp;&amp; npm run dev</code><br />
+          и откройте адрес, который выведет команда (обычно
+          <code>http://localhost:5173</code>).<br /><br />
+          Подробности — в консоли разработчика браузера (F12).
+        </div>
+      </div>
     </div>
 
+    <script>
+      // Если модульный скрипт не выполнился вовсе (например, страницу
+      // открыли напрямую по file:// и браузер заблокировал ES-модуль по
+      // CORS) — main.js никогда не запустится и не сможет сам показать
+      // ошибку. Подстраховываемся снаружи: если экран загрузки всё ещё
+      // виден через разумное время, показываем подсказку.
+      window.addEventListener(
+        'error',
+        (e) => {
+          if (e.target && e.target.tagName === 'SCRIPT') showLoadingHint();
+        },
+        true
+      );
+      setTimeout(showLoadingHint, 8000);
+
+      function showLoadingHint() {
+        const overlay = document.getElementById('loadingOverlay');
+        const hint = document.getElementById('loadingHint');
+        if (overlay && hint) hint.hidden = false;
+      }
+    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

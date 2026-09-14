@@ -255,6 +255,7 @@ function buildDebugLabels(scene, chukoMeshes, khanMesh) {
 
 bootstrap().catch((err) => {
   console.error(err);
-  const overlay = document.getElementById('loadingOverlay');
-  if (overlay) overlay.textContent = `Ошибка запуска: ${err.message}`;
+  const spinner = document.getElementById('loadingSpinnerText');
+  if (spinner) spinner.textContent = `Ошибка запуска: ${err.message}`;
+  document.getElementById('loadingHint')?.removeAttribute('hidden');
 });
