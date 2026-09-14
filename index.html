@@ -310,6 +310,14 @@
         if (overlay && hint) hint.hidden = false;
       }
     </script>
+
+    <!-- Общий LMS-контракт (см. docs/LMS_API.md) — те же файлы, что и в
+         ЧҮКӨ Modern 3D / ALTYN KHAN, только каталог сценариев свой.
+         Обычные (не module) скрипты: адаптер должен быть глобальным
+         window.X2LMS, одинаковым во всех играх. -->
+    <script src="lms-config.js"></script>
+    <script src="src/scenario-catalog.js"></script>
+    <script src="lms-adapter.js"></script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

@@ -17,7 +17,6 @@ import { setupInput } from './input.js';
 import { assistTrajectory } from './flick.js';
 import { getSource, clearSelection } from './pair-selector.js';
 import { createCollector, resetCollector, collectPiece } from './collector.js';
-import { requestDemoTicket, finishDemoTicket } from './lms-adapter.js';
 import { GameStateMachine, GameStates } from './game-state.js';
 import { ScenarioEngine, SCENARIO_CODES } from './scenario-engine.js';
 
@@ -38,6 +37,21 @@ async function bootstrap() {
   const ui = buildUI(gameState);
   const debugLayer = buildDebugLabels(scene, chukoMeshes, khanMesh);
 
+  // window.X2LMS / window.X2_GAME_CONFIG: общий LMS-контракт, см.
+  // lms-adapter.js и docs/LMS_API.md. Загружается как classic-скрипт до
+  // этого модуля (index.html), поэтому доступен как глобал, не import.
+  const LMS = window.X2LMS;
+  if (!LMS) throw new Error('lms-adapter.js не загружен — window.X2LMS отсутствует');
+  const lmsSettings = await LMS.getGameSettings();
+  let balance = Number(lmsSettings.mode === 'demo' ? lmsSettings.demoBalance : lmsSettings.balance) || 0;
+  LMS.emit('X2_GAME_BALANCE_LOADED', {
+    gameId: lmsSettings.gameId,
+    balance,
+    currency: lmsSettings.currency,
+    currencyDisplay: lmsSettings.currencyDisplay,
+    mode: lmsSettings.mode,
+  });
+
   let rerollAttempts = 0;
   let stableFrames = 0;
   let stabilizeFrames = 0;
@@ -45,12 +59,33 @@ async function bootstrap() {
   let currentTicket = null;
   let reservedForKhan = null;
 
-  function beginTicket() {
+  async function beginTicket() {
     if (!gameState.is(GameStates.INIT, GameStates.FINISHED, GameStates.RESULT)) return;
 
     gameState.set(GameStates.REQUESTING_TICKET);
-    currentTicket = requestDemoTicket(ui.getForcedScenarioCode());
-    scenarioEngine.start(currentTicket.scenarioCode);
+
+    const request = {
+      gameId: lmsSettings.gameId,
+      denomination: lmsSettings.denomination,
+      currency: lmsSettings.currency,
+      currencyDisplay: lmsSettings.currencyDisplay,
+      language: lmsSettings.language,
+      demoBalance: balance,
+    };
+
+    let ticket;
+    try {
+      ticket = lmsSettings.mode === 'demo' ? await LMS.createDemoTicket(request) : await LMS.createTicket(request);
+    } catch (err) {
+      LMS.emit('X2_GAME_ERROR', { stage: 'newGame', code: err.code || 'GAME_START_ERROR', message: err.message });
+      gameState.set(GameStates.FINISHED);
+      ui.setHint('Не удалось получить билет — попробуйте ещё раз');
+      return;
+    }
+
+    currentTicket = ticket;
+    balance = Number(ticket.balance);
+    scenarioEngine.start(ticket.scenarioKey);
 
     clearSelection();
     resetCollector(collector);
@@ -64,8 +99,20 @@ async function bootstrap() {
     khanMesh.metadata.state = 'idle';
     for (const m of chukoMeshes) m.metadata.state = 'idle';
 
-    ui.setTicket(currentTicket);
+    ui.setTicket(ticket);
     ui.setHint('Рассыпаем чүкө…');
+
+    LMS.emit('X2_GAME_TICKET_READY', {
+      gameId: lmsSettings.gameId,
+      ticketId: ticket.ticketId,
+      scenario: ticket.scenario,
+      scenarioKey: ticket.scenarioKey,
+      denomination: ticket.denomination,
+      currency: ticket.currency,
+      currencyDisplay: ticket.currencyDisplay,
+      language: ticket.language,
+      mode: lmsSettings.mode,
+    });
 
     scatterAll(chukoMeshes, khanMesh);
     gameState.set(GameStates.SCATTERING);
@@ -164,6 +211,19 @@ async function bootstrap() {
     if (payload) {
       gameState.set(GameStates.RESULT);
       ui.showResult(currentTicket, payload);
+      LMS.emit('X2_GAME_ROUND_COMPLETE', {
+        gameId: lmsSettings.gameId,
+        ticketId: currentTicket.ticketId,
+        scenario: currentTicket.scenario,
+        scenarioKey: currentTicket.scenarioKey,
+        win: currentTicket.win,
+        balance: currentTicket.balance,
+        denomination: currentTicket.denomination,
+        currency: currentTicket.currency,
+        currencyDisplay: currentTicket.currencyDisplay,
+        language: currentTicket.language,
+        mode: lmsSettings.mode,
+      });
       return;
     }
     if (scenarioEngine.khanUnlocked) {
@@ -227,7 +287,6 @@ async function bootstrap() {
   gameState.set(GameStates.FINISHED);
   ui.onFinishTicket(() => {
     if (!gameState.is(GameStates.RESULT)) return;
-    if (currentTicket) finishDemoTicket(currentTicket);
     gameState.set(GameStates.FINISHED);
     ui.setHint('Нажмите «НОВЫЙ БИЛЕТ»');
   });
@@ -252,12 +311,23 @@ function buildUI(gameState) {
   const debugBodiesCb = document.getElementById('dbgBodies');
   const debugLabelsCb = document.getElementById('dbgLabels');
 
+  // QA-форсирование сценария идёт через ?scenario=, как в lms-adapter.js
+  // (см. docs/LMS_API.md §13) — тот же файл адаптера читает этот параметр
+  // один раз при загрузке, поэтому смена значения перезагружает страницу.
+  const currentForcedScenario = new URLSearchParams(window.location.search).get('scenario');
   for (const code of SCENARIO_CODES) {
     const opt = document.createElement('option');
     opt.value = code;
     opt.textContent = code;
     scenarioSelect.appendChild(opt);
   }
+  scenarioSelect.value = currentForcedScenario && SCENARIO_CODES.includes(currentForcedScenario) ? currentForcedScenario : 'AUTO';
+  scenarioSelect.addEventListener('change', () => {
+    const url = new URL(window.location.href);
+    if (scenarioSelect.value === 'AUTO') url.searchParams.delete('scenario');
+    else url.searchParams.set('scenario', scenarioSelect.value);
+    window.location.href = url.toString();
+  });
 
   debugFpsCb.checked = CONFIG.debug.showFps;
   debugBodiesCb.checked = CONFIG.debug.showPhysicsBodies;
@@ -288,11 +358,8 @@ function buildUI(gameState) {
     onFinishTicket(cb) {
       finishCb = cb;
     },
-    getForcedScenarioCode() {
-      return scenarioSelect.value === 'AUTO' ? null : scenarioSelect.value;
-    },
     setTicket(ticket) {
-      ticketText.textContent = `Билет: ${ticket.ticketId} · ${ticket.scenarioCode}`;
+      ticketText.textContent = `Билет: ${ticket.ticketId} · ${ticket.scenarioKey} · баланс: ${ticket.balance} ${ticket.currencyDisplay || ''}`;
     },
     setStatus(text) {
       statusText.textContent = text;
@@ -308,7 +375,9 @@ function buildUI(gameState) {
       resultPanel.hidden = false;
       resultTitle.textContent = payload.resultLabel ?? 'Без УПАЙ';
       resultAmount.textContent =
-        ticket.winAmount > 0 ? `Выигрыш (DEMO): ${ticket.winAmount}` : 'В этот раз без выигрыша';
+        ticket.win > 0
+          ? `Выигрыш${ticket.demo ? ' (DEMO)' : ''}: ${ticket.win} ${ticket.currencyDisplay || ''}`
+          : 'В этот раз без выигрыша';
     },
     updateFps(fps) {
       if (!CONFIG.debug.showFps) return;
