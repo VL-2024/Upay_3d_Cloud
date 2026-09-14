@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>УПАЙ — 3D-прототип v0.1</title>
+    <style>:root{--ui-height:24vh;--lightningcss-light: ;--lightningcss-dark:initial;color-scheme:dark}*{box-sizing:border-box}html,body{color:#f2efe6;touch-action:none;background:#0a0a0d;width:100%;height:100%;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;overflow:hidden}#app{width:100%;height:100%;position:relative}#renderCanvas{touch-action:none;outline:none;width:100%;height:100%;position:absolute;top:0;left:0}#fpsText{color:#9be79b;pointer-events:none;z-index:5;background:#00000059;border-radius:4px;padding:2px 6px;font-size:12px;position:absolute;top:8px;right:10px}#ui{height:var(--ui-height);min-height:150px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:10;background:linear-gradient(#0f0c0abf,#14100d 30%);border-top:1px solid #ffffff14;flex-direction:column;justify-content:space-between;gap:8px;display:flex;position:absolute;bottom:0;left:0;right:0}#statusRow{color:#c9c2b3;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;display:flex}#stateText{color:#e8b64a;font-weight:600}#statusText{text-align:right;text-overflow:ellipsis;white-space:nowrap;flex:1;overflow:hidden}#controlsRow{align-items:center;gap:10px;display:flex}#scenarioSelect{color:#f2efe6;background:#1c1712;border:1px solid #4a3c2a;border-radius:8px;padding:10px 8px;font-size:14px}#scatterBtn{letter-spacing:.04em;color:#241a06;background:linear-gradient(#e8b64a,#c98d1d);border:none;border-radius:12px;flex:1;padding:14px 10px;font-size:18px;font-weight:700;box-shadow:0 2px #7d5b12}#scatterBtn:active{box-shadow:none;transform:translateY(1px)}#scatterBtn:disabled{color:#8a8477;box-shadow:none;background:#4a4238}#debugRow{color:#8f9490;flex-wrap:wrap;gap:14px;font-size:11px;display:flex}#debugRow label{align-items:center;gap:4px;display:flex}#loadingOverlay{color:#e8b64a;letter-spacing:.08em;text-align:center;z-index:100;background:#0a0a0d;flex-direction:column;justify-content:center;align-items:center;gap:16px;padding:24px;font-size:16px;display:flex;position:absolute;inset:0}#loadingHint{letter-spacing:normal;color:#d8d2c4;max-width:420px;font-size:13px;line-height:1.6}#loadingHint code{color:#f2efe6;background:#ffffff14;border-radius:4px;padding:1px 5px;font-size:12px}</style>
+    <script type="module" crossorigin src="./assets/index-D8Hkj1r9.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/math.scalar.functions-BWXNux-o.js">
+    <link rel="modulepreload" crossorigin href="./assets/observable.pure-H-M_hi7F.js">
+    <link rel="modulepreload" crossorigin href="./assets/performanceConfigurator-UtxC_Odd.js">
+    <link rel="modulepreload" crossorigin href="./assets/engineStore-B_7KzytD.js">
+    <link rel="modulepreload" crossorigin href="./assets/math.vector.pure-BAJs8R8E.js">
+    <link rel="modulepreload" crossorigin href="./assets/logger-CuBYPcDK.js">
+    <link rel="modulepreload" crossorigin href="./assets/tools.functions-CGAPgMh0.js">
+    <link rel="modulepreload" crossorigin href="./assets/webRequest-dqz0dHXK.js">
+    <link rel="modulepreload" crossorigin href="./assets/precisionDate-CfCevjl-.js">
+    <link rel="modulepreload" crossorigin href="./assets/halfFloat-Ce77JD5z.js">
+    <link rel="modulepreload" crossorigin href="./assets/tools.pure-QMswWMm1.js">
+    <link rel="modulepreload" crossorigin href="./assets/math.color.pure-CaHjkGe9.js">
+    <link rel="modulepreload" crossorigin href="./assets/decorators-D3kDnvNy.js">
+    <link rel="modulepreload" crossorigin href="./assets/shaderStore-D-XQlhUT.js">
+    <link rel="modulepreload" crossorigin href="./assets/webAudioBaseSubGraph-D0ajKcgP.js">
+    <link rel="modulepreload" crossorigin href="./assets/abstractSoundSource-B3SG6se2.js">
+    <link rel="modulepreload" crossorigin href="./assets/meshUboDeclaration-BATNZvmb.js">
+    <link rel="modulepreload" crossorigin href="./assets/sceneUboDeclaration-B96Tfx7b.js">
+    <link rel="modulepreload" crossorigin href="./assets/sceneUboDeclaration-B5VhSG0v.js">
+    <link rel="modulepreload" crossorigin href="./assets/meshUboDeclaration-BmNu2KU_.js">
+    <link rel="modulepreload" crossorigin href="./assets/clusteredLightingFunctions-BFCOODPn.js">
+    <link rel="modulepreload" crossorigin href="./assets/clusteredLightingFunctions-DNqaoQCj.js">
+    <link rel="modulepreload" crossorigin href="./assets/ltcHelperFunctions-D8BySwCQ.js">
+    <link rel="modulepreload" crossorigin href="./assets/ltcHelperFunctions-DS3Utz6C.js">
+    <link rel="modulepreload" crossorigin href="./assets/mainUVVaryingDeclaration-B_7d0nc3.js">
+    <link rel="modulepreload" crossorigin href="./assets/objectIdFunctions-B7azwFhh.js">
+    <link rel="modulepreload" crossorigin href="./assets/samplerFragmentDeclaration-CEHqUfAO.js">
+    <link rel="modulepreload" crossorigin href="./assets/mainUVVaryingDeclaration-BBamQlxR.js">
+    <link rel="modulepreload" crossorigin href="./assets/objectIdFunctions-532nR7xV.js">
+    <link rel="modulepreload" crossorigin href="./assets/samplerFragmentDeclaration-3yaLawFX.js">
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="renderCanvas"></canvas>
+      <div id="fpsText"></div>
+
+      <div id="ui">
+        <div id="statusRow">
+          <span id="stateText">LOADING</span>
+          <span id="statusText">УПАЙ v0.1</span>
+        </div>
+
+        <div id="controlsRow">
+          <select id="scenarioSelect">
+            <option value="ONE" selected>Сценарий: ONE</option>
+            <option value="ZERO">Сценарий: ZERO</option>
+            <option value="KHAN">Сценарий: KHAN</option>
+          </select>
+          <button id="scatterBtn" type="button">РАССЫПАТЬ</button>
+        </div>
+
+        <div id="debugRow">
+          <label><input type="checkbox" id="dbgFps" /> FPS</label>
+          <label><input type="checkbox" id="dbgLabels" /> Положения</label>
+          <label><input type="checkbox" id="dbgBodies" /> Физ. тела</label>
+        </div>
+      </div>
+
+      <div id="loadingOverlay">
+        <div id="loadingSpinnerText">ЗАГРУЗКА УПАЙ…</div>
+        <div id="loadingHint" hidden>
+          Игра не смогла запуститься в браузере.<br />
+          Если вы открыли этот файл двойным кликом (адрес начинается с
+          <code>file://</code>), браузер блокирует загрузку — так работать
+          не будет.<br /><br />
+          Запустите через локальный сервер:<br />
+          <code>npm install &amp;&amp; npm run dev</code><br />
+          и откройте адрес, который выведет команда (обычно
+          <code>http://localhost:5173</code>).<br /><br />
+          Подробности — в консоли разработчика браузера (F12).
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Если модульный скрипт не выполнился вовсе (например, страницу
+      // открыли напрямую по file:// и браузер заблокировал ES-модуль по
+      // CORS) — main.js никогда не запустится и не сможет сам показать
+      // ошибку. Подстраховываемся снаружи: если экран загрузки всё ещё
+      // виден через разумное время, показываем подсказку.
+      window.addEventListener(
+        'error',
+        (e) => {
+          if (e.target && e.target.tagName === 'SCRIPT') showLoadingHint();
+        },
+        true
+      );
+      setTimeout(showLoadingHint, 8000);
+
+      function showLoadingHint() {
+        const overlay = document.getElementById('loadingOverlay');
+        const hint = document.getElementById('loadingHint');
+        if (overlay && hint) hint.hidden = false;
+      }
+    </script>
+  </body>
+</html>
